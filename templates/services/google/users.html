@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+        <title>VServer</title>
+        <link rel="stylesheet" href="/static/css/bootstrap.css" />
+        <link rel="stylesheet" href="/static/css/bootstrap-responsive.css" />
+        <script type="text/javascript" src="http://ajax.aspnetcdn.com/ajax/jquery/jquery-1.8.0.js"></script>
+        <script type="text/javascript" src="/static/js/bootstrap.js"></script>
+        <script type="text/javascript" src="/static/js/knockout.js"></script>
+        <script type="text/javascript" src="/static/js/knockoutJsGrid.js"></script>
+        <script type="text/javascript">
+        $(function() {
+        //source array
+                var usersList = [
+                {% if data %}
+                {% for user in data %}
+                    {% for links in user.link %}
+                        {% if links.type == "image/*" %}
+                        {"user_photo": "<img src='{{ googleGetProfilePhoto(links.href) }}'></img>", 
+                        {% endif %}
+                    {% endfor %}    
+                "user_name": "{{ user.name.given_name.text }}", 
+                "user_login": "{{ user.name.family_name.text }}", 
+                "user_id": "{{ loop.index }}", 
+                "email": "{% for email in user.email %}{% if email.primary %}{{ email.address }}{% endif %}{% endfor %}",
+                "orgName": "{% if user.organization %}{{ user.organization.name.text }}{% endif %}",
+                "orgTitle": "{% if user.organization %}{{ user.organization.title.text }}{% endif %}",
+                "phone_number": "{% if user.phone_number %}{{ user.phone_number[0].text }}{% endif %}", 
+                "status": "{{ user.rights }}", 
+                "country": "Russia"},
+
+                {% endfor %}
+                ];
+                {% endif %}
+                var viewModel = $("#userGrid").grid({
+                    //        url: "/users/list",
+                    //        srcName: "users",
+srcArray: usersList,
+elementsCount: 5,
+ko: ko,
+paginator: true,
+columns: [
+{title: "#", key: "number", width: "3%"},
+{title: "Photo", key: "user_name", data_bind: "html: user_photo, click: $root.editUser", width: "20%", isRef:true, href: "#userDialog", sortable: false},
+{title: "User name", key: "user_name", data_bind: "text: user_name, click: $root.editUser", width: "20%", isRef:true, href: "#userDialog", sortable: true},
+{title: "User family name", key: "user_login", data_bind: "text: user_login", width: "15%", sortable: true},
+{title: "Email", key: "email", data_bind: "text: email", width: "20%", sortable: true},
+{title: "Organization", key: "orgName", data_bind: "text: orgName", width: "20%", sortable: true},
+{title: "Position", key: "orgTitle", data_bind: "text: orgTitle", width: "20%", sortable: true},
+{title: "Phone number", key: "phone_number", data_bind: "text: phone_number", width: "20%", sortable: true},
+{title: "Country", key: "country", data_bind: "text: country", width: "10%", sortable: true},
+{title: "Status", key: "status", data_bind: "text: status", width: "10%", sortable: true},
+{title: "Actions", key: "action", content: "<i class=\"icon-remove\"></i>",
+data_bind: "attr: { userId: user_id }, click: $root.removeRow", width: "7%", sortable: false}
+]
+});
+
+//add filters
+$.grid.filters({
+        "user_photo": {cssStyle: "input-xlarge", type: "text", placeholder: "Name"},
+        "user_name": {cssStyle: "input-medium", type: "text", placeholder: "Name"},
+        "user_login": {cssStyle: "input-medium", type: "text", placeholder: "Surname"},
+        "email": {cssStyle: "input-medium", type: "text", placeholder: "Email"},
+        "orgName": {cssStyle: "input-medium", type: "text", placeholder: "Organization"},
+        "orgTitle": {cssStyle: "input-medium", type: "text", placeholder: "Position"},
+        "phone_number": {cssStyle: "input-medium", type: "text", placeholder: "Phone Number"},
+        "country": {cssStyle: "input-medium", type: "select", data: ["All", "Russia"]},
+        "status": {cssStyle: "input-medium", type: "select", data: ["All", "guest", "user", "moderator", "admin"]}
+        });
+
+    viewModel.message = ko.observable()
+viewModel.showMessage = ko.observable(false)
+    /**
+     * Remove rows from datagrid (extend viewModel)
+     */
+    viewModel.removeRow = function() {
+        viewModel.message(this.user_name() + " was removed!")
+            viewModel.currentElements.remove(this)
+            viewModel.allElements.remove(this)
+            viewModel.showMessage(true)
+            setTimeout(function() {viewModel.showMessage(false)},1000);
+    };
+
+/**
+ * Edit rows in datagrid (extend viewModel)
+ */
+viewModel.editUser = function() {
+    //now put all data from this to dialog
+    var currentUser = this;
+    var userIndex = $.inArray(currentUser, viewModel.currentElements())
+
+        $("#dialog-name").val(currentUser.user_name());
+    $("#dialog-login").val(currentUser.user_login());
+    $("#dialog-email").val(currentUser.email());
+    $("#dialog-orgName").val(currentUser.orgName());
+    $("#dialog-orgTitle").val(currentUser.orgTitle());
+    $("#dialog-phone_number").val(currentUser.phone_number());
+    $("#country-list option:contains(" + currentUser.country() + ")").attr('selected', 'selected');
+    $("#status-list option:contains(" + currentUser.status() + ")").attr('selected', 'selected');
+    $("#saveBtn").unbind()
+        //save data
+        $("#saveBtn").click(function() {
+                currentUser.user_name($("#dialog-name").val());
+                currentUser.user_login($("#dialog-login").val());
+                currentUser.email($("#dialog-email").val());
+                currentUser.orgName($("#dialog-orgName").val());
+                currentUser.orgTitle($("#dialog-orgTitle").val());
+                currentUser.phone_number($("#dialog-phone_number").val());
+                currentUser.country($("#country-list option:selected").text());
+                currentUser.status($("#status-list option:selected").text());
+
+                viewModel.currentElements()[userIndex] = currentUser;
+                var success;
+                var dataType = 'text';
+                var phone = { 'MobileNew': $("#dialog-phone_number").val(), };
+                var orgName = $("#dialog-orgName").val();
+                var orgTitle = $("#dialog-orgTitle").val();
+                var userData = {
+                    'email': $("#dialog-email").val(),
+                    'phone': phone,
+                    'orgName': orgName,
+                    'orgTitle': orgTitle,
+                    'phone_erize': 'True',
+                };
+                var myData = {
+                    'ajax': 'True',
+                    'type': 'google',
+                    'api':  'profile',
+                    'action': 'edit',
+                    'object': 'user_profile',
+                    'data': userData,
+                };
+                var Profile = {
+                    'email': $("#dialog-email").val(),
+                    'given_name': $("#dialog-name").val(),
+                    'family_name': $("#dialog-login").val(),
+                };
+                var json = JSON.stringify(myData);
+                $.ajax({
+                    type: "POST",
+                    url: '/api',
+                    data: json,
+                    success: success,
+                    contentType: 'application/json;charset=UTF-8',
+                    dataType: 'html',
+                });
+                myData = {
+                    'ajax': 'True',
+                    'type': 'google',
+                    'api':  'users',
+                    'action': 'edit',
+                    'object': 'user',
+                    'data': Profile,
+                };
+                json = JSON.stringify(myData);
+                $.ajax({
+                    type: "POST",
+                    url: '/api',
+                    data: json,
+                    success: success,
+                    contentType: 'application/json;charset=UTF-8',
+                    dataType: 'html',
+                });
+                $("#userDialog").modal('hide')
+                var myDataGet = {
+                    'ajax': 'True',
+                    'type': 'google',
+                    'api':  'profile',
+                    'action': 'get',
+                    'object': 'user_profile',
+                    'data': { 'email': $("#dialog-email").val() },
+                };
+                console.log(json);
+                var json = JSON.stringify(myDataGet);
+                request = $.ajax({
+                    type: "POST",
+                    url: '/api',
+                    data: json,
+                    contentType: 'application/json;charset=UTF-8',
+                    dataType: 'html',
+                });
+                request.done(function (response, textStatus, jqXHR){
+                        // log a message to the console
+                        alert(response);
+                        console.log(response);
+                 });
+                var myDataUser = {
+                    'ajax': 'True',
+                    'type': 'google',
+                    'api':  'users',
+                    'action': 'get',
+                    'object': 'user',
+                    'data': { 'login': 'vagner' },
+                };
+                json = JSON.stringify(myDataUser);
+                request = $.ajax({
+                    type: "POST",
+                    url: '/api',
+                    data: json,
+                    contentType: 'application/json;charset=UTF-8',
+                    dataType: 'html',
+                });
+                request.done(function (response, textStatus, jqXHR){
+                        // log a message to the console
+                        alert(response);
+                        console.log(response);
+                 });
+
+                viewModel.message("User " + currentUser.user_name() + " was edited!")
+                viewModel.showMessage(true)
+
+                setTimeout(function() {viewModel.showMessage(false)},1000);
+                });
+};
+
+/**
+ * Add row to grid
+ */
+$("#addUser").click(function() {
+        var userData = {};
+        $("input").val('');
+        $("select").val('');
+        $("#saveBtn").unbind()
+        $("#saveBtn").click(function() {
+            userData.user_photo = $("#dialog-photo").val();
+            userData.user_name = $("#dialog-name").val();
+            userData.user_login = $("#dialog-login").val();
+            userData.email = $("#dialog-email").val();
+            userData.orgName = $("#dialog-orgName").val();
+            userData.orgTitle = $("#dialog-orgTitle").val();
+            userData.phone_number = $("#dialog-phone_number").val();
+            userData.country = $("#country-list option:selected").text();
+            userData.status = $("#status-list option:selected").text();
+            userData.user_id = "0";
+            viewModel.currentElements.push(new $.grid.Item(ko, userData));
+            $("#userDialog").modal('hide')
+            });
+        });
+
+ko.bindingHandlers.fadeVisible = {
+init: function(element, valueAccessor) {
+          var value = valueAccessor();
+          $(element).toggle(ko.utils.unwrapObservable(value));
+      },
+update: function(element, valueAccessor) {
+            var value = valueAccessor();
+            ko.utils.unwrapObservable(value) ? $(element).fadeIn() : $(element).fadeOut();
+        }
+};
+
+ko.applyBindings(viewModel, document.getElementById("usersGrid"));
+
+});
+        </script>
+        <!--<script type="text/javascript" src="/static/js/users.js"></script>-->
+    </head>
+    <body>
+        <script src="/static/js/menu.js"></script>
+        <br>
+        <br>
+        <br>
+        <div id="content">
+            <div id="userGrid"></div>
+            <a href="#userDialog" role="button" class="btn btn-primary" id="addUser" data-toggle="modal">Add user</a>
+            <h3 data-bind="fadeVisible: showMessage, text: message"></h3>
+        </div>
+
+        <div class="modal" id="userDialog" tabindex="-1" role="dialog" aria-labelledby="myModalLabel" aria-hidden="true" style="display: none;">
+            <div class="modal-header">
+                <button type="button" class="close" data-dismiss="modal" aria-hidden="true">×</button>
+                <h3 id="myModalLabel">Update data</h3>
+            </div>
+            <div class="modal-body" id="userData">
+                <table class="table">
+                    <tr>
+                        <td>Photo:</td><td><input type="text" id="dialog-photo" value="" style="width: 100%;"></td>
+                    </tr>
+                    <tr>
+                        <td>User name:</td><td><input type="text" id="dialog-name" value="" style="width: 100%;"></td>
+                    </tr>
+                    <tr>
+                        <td>User family name:</td><td><input type="text" id="dialog-login" value="" style="width: 100%;"></td>
+                    </tr>
+                    <tr>
+                        <td>Email:</td><td><input type="text" id="dialog-email" value="" style="width: 100%;"></td>
+                    </tr>
+                    <tr>
+                        <td>Organization:</td><td><input type="text" id="dialog-orgName" value="" style="width: 100%;"></td>
+                    </tr>
+                    <tr>
+                        <td>Position:</td><td><input type="text" id="dialog-orgTitle" value="" style="width: 100%;"></td>
+                    </tr>
+                    <tr>
+                        <td>Phone number:</td><td><input type="text" id="dialog-phone_number" value="" style="width: 100%;"></td>
+                    </tr>
+                    <tr>
+                        <td>Country:</td>
+                        <td>
+                            <select id="country-list">
+                                <option></option>
+                                <option>Russia</option>
+                            </select>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>Status:</td>
+                        <td>
+                            <select id="status-list">
+                                <option></option>
+                                <option>guest</option>
+                                <option>user</option>
+                                <option>moderator</option>
+                                <option>admin</option>
+                            </select>
+                        </td>
+                    </tr>
+                </table>
+            </div>
+            <div class="modal-footer">
+                <button class="btn" data-dismiss="modal" id="closeBtn" aria-hidden="true">Close</button>
+                <button class="btn btn-primary" id="saveBtn" >Save changes</button>
+            </div>
+        </div>
+
+        <style>
+            #content {
+                font-size: 12px;
+                width: 80%;
+            }
+        </style>
+    </body>
+</html>

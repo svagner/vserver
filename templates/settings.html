@@ -1,0 +1,439 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<meta name="robots" content="all" />
+<title>VServer system</title>
+<link href="/static/css/settings/vertical_menu.css" rel="stylesheet" type="text/css" />
+<script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.4.2/jquery.min.js"></script>
+<script type='text/javascript' src='/static/js/jquery/jquery.hoverIntent.minified.js'></script>
+<script type='text/javascript' src='/static/js/jquery/jquery.dcverticalmegamenu.1.1.js'></script>
+
+<link rel="stylesheet" href="/static/css/settings/reset.css">
+<link rel="stylesheet" href="/static/css/settings/animate.css">
+<link rel="stylesheet" href="/static/css/settings/styles.css">
+
+<script type="text/javascript">
+$(document).ready(function($){
+	$('#mega-1').dcVerticalMegaMenu({
+		rowItems: '3',
+		speed: 'fast',
+		effect: 'slide',
+		direction: 'right'
+	});
+});
+</script>
+{% if settings_type == 'internal' %}
+    <link rel="stylesheet" href="/static/css/bootstrap.css" />
+    <link rel="stylesheet" href="/static/css/bootstrap-responsive.css" />
+    <script type="text/javascript" src="http://ajax.aspnetcdn.com/ajax/jquery/jquery-1.8.0
+.js"></script>
+    <script type="text/javascript" src="/static/js/bootstrap.js"></script>
+    <script type="text/javascript" src="/static/js/knockout.js"></script>
+    <script type="text/javascript" src="/static/js/knockoutJsGrid.js"></script>
+    <script type="text/javascript">
+    $(function() {
+        //source array
+        var usersList = [
+        {% for login in users.keys() %}{
+        "user_name": "{{ users[login]['username'] }}", 
+            "user_login": "{{ login }}", 
+            "user_id": "{{ loop.index }}", 
+            "email": "{{ users[login]['email'] }}",
+            "user_role": "{{ users[login]['role'] }}"
+            },{% endfor %} 
+        ];
+        var userCount = usersList.length;
+        for (admin in usersList) {
+            console.log(admin["user_role"]);
+            if (admin['user_role'] == "admin") {
+                alert(admin['user_login']);
+            }
+        }
+        var viewModel = $("#userGrid").grid({
+            srcArray: usersList,
+            elementsCount: 5,
+            ko: ko,
+            paginator: true,
+            columns: [
+                {title: "#", key: "number", width: "3%"},
+                {title: "User name", key: "user_name", data_bind: "text: user_name, click: $root.editUser", width: "20%", isRef:true, href: "#userDialog", sortable: true},
+                {title: "Login", key: "user_login", data_bind: "text: user_login", width: "15%", sortable: true},
+                {title: "Email", key: "email", data_bind: "text: email", width: "20%", sortable: true},
+                {title: "Role", key: "user_role", data_bind: "text: user_role", width: "10%", sortable: true},
+                {title: "Actions", key: "action", content: "<i class=\"icon-remove\"></i>", data_bind: "attr: { userId: user_id }, click: $root.removeRow", width: "7%", sortable: false}
+            ]
+    });
+
+//add filters
+    $.grid.filters({ 
+        "user_name": {cssStyle: "input-medium", type: "text", placeholder: "Name"},
+        "user_login": {cssStyle: "input-medium", type: "text", placeholder: "Login"},
+        "user_password": {cssStyle: "input-medium", type: "text", placeholder: "Password"},
+        "email": {cssStyle: "input-medium", type: "text", placeholder: "Email"},
+        "user_role": {cssStyle: "input-medium", type: "select", data: ["All", "guest", "user", "moderator", "admin"]}
+        });
+
+    viewModel.message = ko.observable()
+viewModel.showMessage = ko.observable(false)
+    viewModel.removeRow = function() {
+            if (userCount > 1) {
+                viewModel.message(this.user_name() + " was removed!")
+                var success;
+                var dataType = 'text';
+                var CurrentUser = this;
+                var Data = {
+                    'ajax': 'True',
+                    'type': 'users',
+                    'api':  'internal',
+                    'action': 'delete',
+                    'object': 'user',
+                    'data': { 'user_login': this.user_login() },
+                };
+                var json = JSON.stringify(Data);
+                var request =  $.ajax({
+                    type: "POST",
+                    url: '/api',
+                    data: json,
+                    success: success,
+                    contentType: 'application/json;charset=UTF-9',
+                    dataType: 'html',
+                });
+                request.done(function (response, textStatus, jqXHR){
+                // log a message to the console
+                    console.log(response);
+                });
+                viewModel.currentElements.remove(this)
+                viewModel.allElements.remove(this)
+                userCount--;
+            } else {
+                viewModel.message(this.user_name() + " wasn't able to remove!")
+            }
+            viewModel.showMessage(true)
+            setTimeout(function() {viewModel.showMessage(false)},1000);
+    };
+
+/**
+ * Edit rows in datagrid (extend viewModel)
+ */
+viewModel.editUser = function() {
+    //now put all data from this to dialog
+    var currentUser = this;
+    var userIndex = $.inArray(currentUser, viewModel.currentElements())
+
+        $("#dialog-name").val(currentUser.user_name());
+    $("#dialog-login").val(currentUser.user_login());
+    $("#dialog-email").val(currentUser.email());
+    $("#dialog-password").val(currentUser.user_password());
+    $("#role-list option:contains(" + currentUser.user_role() + ")").attr('selected', 'selected');
+    $("#saveBtn").unbind()
+        //save data
+        $("#saveBtn").click(function() {
+                currentUser.user_name($("#dialog-name").val());
+                currentUser.user_login($("#dialog-login").val());
+                currentUser.user_password($("#dialog-password").val());
+                currentUser.email($("#dialog-email").val());
+                currentUser.user_role($("#role-list option:selected").text());
+
+                viewModel.currentElements()[userIndex] = currentUser;
+                var dataType = 'text';
+                var userData = {
+                    'email': $("#dialog-email").val(),
+                    'user_login': $("#dialog-login").val(),
+                    'user_role': $("#role-list option:selected").text(),
+                    'user_name': $("#dialog-name").val(),
+                    'user_password': $("#dialog-password").val(),
+                };
+                var Data = {
+                    'ajax': 'True',
+                    'type': 'users',
+                    'api':  'internal',
+                    'action': 'add',
+                    'object': 'user',
+                    'data': userData,
+                };
+                var json = JSON.stringify(Data);
+                var request =  $.ajax({
+                    type: "POST",
+                    url: '/api',
+                    data: json,
+                    success: success,
+                    contentType: 'application/json;charset=UTF-9',
+                    dataType: 'html',
+                });
+                request.done(function (response, textStatus, jqXHR){
+                        // log a message to the console
+                        console.log(response);
+                        });
+$("#userDialog").modal('hide')
+    viewModel.message("User " + currentUser.user_name() + " was edited!")
+viewModel.showMessage(true)
+
+    setTimeout(function() {viewModel.showMessage(false)},1000);
+    });
+};
+
+/**
+ * Add row to grid
+ */
+$("#addUser").click(function() {
+        var userData = {};
+        $("input").val('');
+        $("select").val('');
+        $("#saveBtn").unbind()
+        $("#saveBtn").click(function() {
+            userData.user_name = $("#dialog-name").val();
+            userData.user_login = $("#dialog-login").val();
+            userData.user_password = $("#dialog-password").val();
+            userData.email = $("#dialog-email").val();
+
+            userData.user_role = $("#role-list option:selected").text();
+            userData.user_id = "0";
+            viewModel.currentElements.push(new $.grid.Item(ko, userData));
+            var success;
+            var dataType = 'text';
+            var Data = {
+                'ajax': 'True',
+                'type': 'users',
+                'api':  'internal',
+                'action': 'add',
+                'object': 'user',
+                'data': userData,
+            };
+            var json = JSON.stringify(Data);
+            var request =  $.ajax({
+                type: "POST",
+                url: '/api',
+                data: json,
+                success: success,
+                contentType: 'application/json;charset=UTF-9',
+                dataType: 'html',
+            });
+            request.done(function (response, textStatus, jqXHR){
+                // log a message to the console
+                console.log(response);
+            });
+
+            $("#userDialog").modal('hide')
+            userCount++;
+            });
+        });
+
+ko.bindingHandlers.fadeVisible = {
+init: function(element, valueAccessor) {
+          var value = valueAccessor();
+          $(element).toggle(ko.utils.unwrapObservable(value));
+      },
+update: function(element, valueAccessor) {
+            var value = valueAccessor();
+            ko.utils.unwrapObservable(value) ? $(element).fadeIn() : $(element).fadeOut();
+        }
+};
+
+ko.applyBindings(viewModel, document.getElementById("usersGrid"));
+});
+    </script>
+    {% endif %}
+</head>
+<body>
+<script src="/static/js/menu.js"></script>
+
+<div class="wrap">
+<div class="demo-container clear">
+<div class="dcjq-vertical-mega-menu">
+<ul id="mega-1" class="menu">
+<li id="menu-item-0"><a href="/settings">Global settings</a></li>
+<li id="menu-item-2"><a href="?type=google">Authorization</a>
+<ul>
+<li id="menu-item-12"><a href="?type=google">Google</a></li>
+<li id="menu-item-13"><a href="?type=ldap">LDAP</a></li>
+<li id="menu-item-14"><a href="?type=pam">PAM/SSH</a></li>
+<li id="menu-item-15"><a href="?type=internal">Internal</a></li>
+</ul>
+</li>
+<li id="menu-item-51"><a href="?type=data">Data settings</a>
+</li>
+</ul>
+</div>
+</div>
+
+{% if not settings_type %}
+<div class="data-container">
+    <style type="text/css">
+table a:link {
+    color: #666;
+    font-weight: bold;
+    text-decoration:none;
+}
+table a:visited {
+    color: #999999;
+    font-weight:bold;
+    text-decoration:none;
+}
+table a:active,
+table a:hover {
+    color: #bd5a35;
+    text-decoration:underline;
+}
+table {
+    font-family:Arial, Helvetica, sans-serif;
+    color:#666;
+    font-size:12px;
+    text-shadow: 1px 1px 0px #fff;
+    background:#eaebec;
+    margin:20px;
+    border:#ccc 1px solid;
+
+    -moz-border-radius:3px;
+    -webkit-border-radius:3px;
+    border-radius:3px;
+
+    -moz-box-shadow: 0 1px 2px #d1d1d1;
+    -webkit-box-shadow: 0 1px 2px #d1d1d1;
+    box-shadow: 0 1px 2px #d1d1d1;
+}
+table th {
+    padding:21px 25px 22px 25px;
+    border-top:1px solid #fafafa;
+    border-bottom:1px solid #e0e0e0;
+    background: #ededed;
+    background: -webkit-gradient(linear, left top, left bottom, from(#ededed), to(#ebebeb));
+    background: -moz-linear-gradient(top,  #ededed,  #ebebeb);
+}
+table th:first-child{
+    text-align: left;
+    padding-left:20px;
+}
+table tr:first-child th:first-child{
+    -moz-border-radius-topleft:3px;
+    -webkit-border-top-left-radius:3px;
+    border-top-left-radius:3px;
+}
+table tr:first-child th:last-child{
+    -moz-border-radius-topright:3px;
+    -webkit-border-top-right-radius:3px;
+    border-top-right-radius:3px;
+}
+table tr{
+    text-align: center;
+    padding-left:20px;
+}
+table tr td:first-child{
+    text-align: left;
+    padding-left:20px;
+    border-left: 0;
+}
+table tr td {
+    padding:18px;
+    border-top: 1px solid #ffffff;
+    border-bottom:1px solid #e0e0e0;
+    border-left: 1px solid #e0e0e0;
+
+    background: #fafafa;
+    background: -webkit-gradient(linear, left top, left bottom, from(#fbfbfb), to(#fafafa));
+    background: -moz-linear-gradient(top,  #fbfbfb,  #fafafa);
+}
+table tr.even td{
+    background: #f6f6f6;
+    background: -webkit-gradient(linear, left top, left bottom, from(#f8f8f8), to(#f6f6f6));
+    background: -moz-linear-gradient(top,  #f8f8f8,  #f6f6f6);
+}
+table tr:last-child td{
+    border-bottom:0;
+}
+table tr:last-child td:first-child{
+    -moz-border-radius-bottomleft:3px;
+    -webkit-border-bottom-left-radius:3px;
+    border-bottom-left-radius:3px;
+}
+table tr:last-child td:last-child{
+    -moz-border-radius-bottomright:3px;
+    -webkit-border-bottom-right-radius:3px;
+    border-bottom-right-radius:3px;
+}
+table tr:hover td{
+    background: #f2f2f2;
+    background: -webkit-gradient(linear, left top, left bottom, from(#f2f2f2), to(#f0f0f0));
+    background: -moz-linear-gradient(top,  #f2f2f2,  #f0f0f0);      
+}
+    </style>
+    <div id="summStatcontainer">
+    <table cellspacing='0'> <!-- cellspacing='0' is important, must stay -->
+        <tr><th>Type</th><th>Service</th><th>Settings</th><th>Status</th><th>Link</th></tr><!-- Table Header -->
+        <tr><td>Auth</td><td>Google</td><td>100%</td><td>{% if settings.google_user and settings.google_password %}Yes{% else %}NO{% endif %}</td><td><a href="?type=google">Set</a></td></tr>
+        <tr class='even'><td>Auth</td><td>LDAP</td><td></td><td>No</td><td><a href="?type=ldap">Set</a></td></tr><!-- Darker Table Row -->
+        <tr><td>Auth</td><td>PAM/SSH</td><td></td><td>No</td><td><a href="?type=pam">Set</a></td></tr>
+        <tr><td>Auth</td><td>Internal</td><td></td><td>No</td><td><a href="?type=internal">Set</a></td></tr>
+        <tr class='even'><td>Data</td><td>Internal storage</td><td></td><td>No</td><td><a href="?type=data&name=pam">Set</a></td></tr><!-- Darker Table Row -->
+    </table>
+    </div>
+</div>
+{% endif %}
+
+{% if settings_type == 'google' %}
+<div class="data-container">
+    <div id="container">
+        <form action="" method="post">
+            <label for="name">Google Directory User:</label>
+            <input type="name" name=googleadmin>
+            <label for="googleadmin">Google Directory Password:</label>
+            <input type="password" name=googlepassword>
+            <div id="lower">
+    {% if error %}   
+                <label class="error">{{ error }}</label>
+    {% endif %}
+                <input type="submit" value="Save">
+            </div>
+        </form>
+    </div>
+</div>
+{% endif %}
+{% if settings_type == 'internal' %}
+    <div id="data-container">
+    <div id="userGrid"></div>
+    <a href="#userDialog" role="button" class="btn btn-primary" id="addUser" data-toggle="modal">Add user</a>
+    <h3 data-bind="fadeVisible: showMessage, text: message"></h3>
+</div>
+
+<div class="modal" id="userDialog" tabindex="-1" role="dialog" aria-labelledby="myModalLabel" aria-hidden="true" style="display: none;">
+    <div class="modal-header">
+        <button type="button" class="close" data-dismiss="modal" aria-hidden="true">×</button>
+        <h3 id="myModalLabel">Update user</h3>
+    </div>
+    <div class="modal-body" id="userData">
+        <table class="table">
+            <tr>
+                <td>User name:</td><td><input type="text" id="dialog-name" value="" style="width: 100%;"></td>
+            </tr>
+            <tr>
+                <td>Login:</td><td><input type="text" id="dialog-login" value="" style="width: 100%;"></td>
+            </tr>
+            <tr>
+                <td>Email:</td><td><input type="text" id="dialog-email" value="" style="width: 100%;"></td>
+            </tr>
+            <tr>
+                <td>Password:</td><td><input type="password" id="dialog-password" value="" style="width: 50%;"></td>
+            </tr>
+            <tr>
+                <td>Role:</td>
+                <td>
+                    <select id="role-list">
+                        <option></option>
+                        <option>guest</option>
+                        <option>user</option>
+                        <option>moderator</option>
+                        <option>admin</option>
+                    </select>
+                </td>
+            </tr>
+        </table>
+    </div>
+    <div class="modal-footer">
+        <button class="btn" data-dismiss="modal" id="closeBtn" aria-hidden="true">Close</button>
+        <button class="btn btn-primary" id="saveBtn" >Save changes</button>
+    </div>
+    </div>   
+{% endif %}
+</div>
+</body>
+</html>

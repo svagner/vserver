@@ -1,0 +1,116 @@
+======================
+Query:
+======================
+{
+    "ajax":"True",
+    "type":"google",
+    "api":"profile",
+    "action":"edit",
+    "object":"user_profile",
+    "data":{
+        "email":"vagner@itsystems.spb.ru",
+        "phone_number":"2222",
+        "phone_label":"Mobile",
+        "user_name":"vagner",
+        "family_name":"test"
+    }
+}
+
+All queries must be sent by json type. Queries must have all fields.
+=====================
+Description:
+=====================
+- "ajax" - could be True or False. For valid query must be True
+- "type" - we have only 2 api types yet. It is "google" for manage google users 
+           profiles and contacts, and "users" for manage access to all VServer's 
+           interfaces
+- "api"  - "google" type has two api methods: "profile" for manage profiles and 
+           "users" for manage google's users. "users" type has one only api method: 
+           "internal" for manage internal authorization.
+- "action" - "google:profile" support 2 actions: "edit" and "get". "google:users" 
+           support "get" only method yet. "users:internal" support two action: 
+           "add" and "delete"
+- "object" - this parametrs for description data type for construction 
+           "type:api:action". All "google:profile" supports only "user_profile" type. 
+           This type will be describe follow. "google:users" supports only "user" 
+           type. "users:internal" supports  only "user" type of data.
+- "data"   - data which has object type           
+
+======================
+Schame of api queries:
+======================
+           google                    users          |-> api type 
+           /     \                     |            | 
+       profile   users              internal        |-> api name
+       /   \       |                 /    \         | 
+    edit   get    get              add   delete     |-> api action
+     |      |      |                |       |       |
+ (user_profile)  (user)             (  user )       |-> api object (data type)
+
+=======================
+Object description for set data:
+=======================
+user_profile:
+===>
+{
+    "email":"vagner@itsystems.spb.ru",
+    "phone": {
+        "Mobile": "2222",
+    },
+    "phone_erize": true,
+    "user_name":"vagner",
+    "family_name":"test",
+    "orgName": "Fotostrana",
+    "orgTitle": "SRE",
+}
+<===
+"email" -  won't be changed. Is's field primary for search profile.
+"phone" - array of key-value. Key is phone label and value is phone number
+"phone_erize" - Do we need to truncate all phone's numbers for this user?
+"user_name" - first user's name
+"family_name" - second user's name
+"orgName" - Team's name
+"orgTitle" - Team's position
+
+users:
+===>
+{
+    "email": "email":"vagner@itsystems.spb.ru",
+    "suspended": False,
+    "family_name": "family",
+    "given_name": "given",
+}
+<===
+
+=======================
+Object description for get data:
+=======================
+user_profile:
+===>
+{
+    "given_name": "givenname",
+    "family_name": "familyname",
+    "email": [ "first@test.com", "second@test.com", ], 
+    "phone_number": [ { "label": "Mobile", "number": "89212121211" }, {} ... ], 
+    "orgName": "SampleOrg",
+    "orgTitle": "Sample word position",
+    "birthday": "datetime"
+    "occupation": data.occupation
+    "status": data.status.text
+    "rights": data.rights
+    "priority": data.priority
+    "gender": data.gender
+    "control": data.control
+    "batch_status": data.batch_status
+    "sensitivity": data.sensitivity
+    "published": data.published
+}
+<===
+
+user:
+{
+    "user_name": "vagner",
+    "suspended": False,
+    "admin": False,
+    "agreed_to_terms": True,
+}
